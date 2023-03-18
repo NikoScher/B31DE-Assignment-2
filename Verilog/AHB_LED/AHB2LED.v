@@ -34,7 +34,7 @@ module AHB2LED(
   begin
 	 if(!HRESETn)
 	 begin
-		rHSEL		<= 1'b0;
+		rHSEL	<= 1'b0;
 		rHADDR	<= 32'h0;
 		rHTRANS	<= 2'b00;
 		rHWRITE	<= 1'b0;
@@ -42,7 +42,7 @@ module AHB2LED(
 	 end
     else if(HREADY)
     begin
-      rHSEL		<= HSEL;
+      	rHSEL	<= HSEL;
 		rHADDR	<= HADDR;
 		rHTRANS	<= HTRANS;
 		rHWRITE	<= HWRITE;

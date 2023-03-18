@@ -37,7 +37,7 @@
 module prescaler(
   input wire inclk,
   output wire outclk
-    );
+);
 
 reg [8:0] counter;
 
