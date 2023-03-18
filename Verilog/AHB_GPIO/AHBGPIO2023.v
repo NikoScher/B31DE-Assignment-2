@@ -1,78 +1,73 @@
-// Very simple GPIO subordinate February 2023.
-// Comprises 16-bit output port that may be written 
-// to at address 0x53xxxxx4, and 16-bit input port 
-// that may be read frintended to be read from at address 
-// 0x53xxxxxx.
-// These addresses are set in, and consistency must be 
-// maintained between, files AHBDCD.v and AHBLITE_SYS.v 
+
+// Insert header comments
 
 module AHBGPIO(
   input wire HCLK,
   input wire HRESETn,
   input wire [31:0] HADDR,
-  input wire [1:0] HTRANS,
   input wire [31:0] HWDATA,
+  input wire [1:0] HTRANS,
   input wire HWRITE,
   input wire HSEL,
   input wire HREADY,
   input wire [15:0] GPIOIN,
   
-	
-	//Output
+	// Output
   output wire HREADYOUT,
   output wire [31:0] HRDATA,
   output wire [15:0] GPIOOUT
   );
+
+  `define DATAREG_ADDR = 8'h5300_0000;
   
-  localparam [7:0] gpio_dataout_addr = 8'h04;
-  
-  reg [15:0] gpio_dataout;
-  reg [15:0] gpio_datain;
-  reg [31:0] last_HADDR;
-  reg [1:0] last_HTRANS;
-  reg last_HWRITE;
-  reg last_HSEL;
-    
-  assign HREADYOUT = 1'b1;
-  
-// Set Registers from address phase  
-  always @(posedge HCLK)
-  begin
-    if(HREADY)
-    begin
-      last_HADDR <= HADDR;
-      last_HTRANS <= HTRANS;
-      last_HWRITE <= HWRITE;
-      last_HSEL <= HSEL;
+  reg [15:0] rOUT;
+  reg [15:0] rIN;
+
+  reg [31:0]  rHADDR;
+  reg [31:0]  rHWDATA;
+  reg [31:0]  rHRDATA;
+  reg         rHWRITE;
+  reg         rHREADYOUT;
+
+  always @(posedge HCLK or negedge HRESETn) begin
+    if(!HRESETn) begin
+      rHADDR    <= DATAREG_ADDR;
+      rHWDATA   <= 32'h0;
+      rHRDATA   <= 32'h0;
+      rHWRITE   <= 1'b0;
+      rHREADYOUT<= 1'b1;
+
+      rOUT      <= 16'h0;
+      rIN       <= 16'h0;
+    end
+
+    if (HSEL) begin
+      rHADDR	<= HADDR;
+      rHWDATA	<= HWDATA;
+      rHWRITE <= HWRITE;
     end
   end
-  
-  // Update output value
-  always @(posedge HCLK, negedge HRESETn)
-  begin
-    if(!HRESETn)
-    begin
-      gpio_dataout <= 16'h0000;
+
+  always @(posedge HCLK) begin
+    rIN <= GPIOIN;
+    if (HSEL) begin
+      // If reading
+      if ((rHWRITE == 1'b0) && HREADY) begin
+        rHREADYOUT <= 1'b1;
+        if (rHADDR == DATAREG_ADDR)
+          rHRDATA[15:0] <= rIN;
+      end
+      // If writing
+      if (rHWRITE == 1'b1) begin
+        rHREADYOUT <= 1'b0;
+        if (rHADDR == DATAREG_ADDR)
+          rOUT <= rHWDATA[15:0];
+      end
     end
-    else if ((last_HADDR[7:0] == gpio_dataout_addr) & last_HSEL & last_HWRITE & last_HTRANS[1])
-      gpio_dataout <= HWDATA[15:0];
   end
-  
-  // Update input value
-  always @(posedge HCLK, negedge HRESETn)
-  begin
-    if(!HRESETn)
-    begin
-      gpio_datain <= 16'h0000;
-    end
-    else 
-    begin
-      gpio_datain <= GPIOIN;
-    end
-      
-  end
-         
-  assign HRDATA[15:0] = gpio_datain;
-  assign GPIOOUT = gpio_dataout;
+
+  assign GPIOOUT = rOUT;
+  assign HRDATA = rHRDATA;
+  assign HREADYOUT = rHREADYOUT;
 
 endmodule
