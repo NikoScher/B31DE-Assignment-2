@@ -72,7 +72,7 @@ module AHBGPIO(
       
   end
          
-  assign HRDATA[15:0] = gpio_datain;  
+  assign HRDATA[15:0] = gpio_datain;
   assign GPIOOUT = gpio_dataout;
 
 endmodule
