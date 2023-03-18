@@ -1,6 +1,17 @@
 *
 
 !*/Verilog/*
+!*/Verilog/AHB_7SEG/*
+!*/Verilog/AHB_BRAM/*
+!*/Verilog/AHB_BUS/*
+!*/Verilog/AHB_GPIO/*
+!*/Verilog/AHB_LED/*
+!*/Verilog/AHB_UART/*
+!*/Verilog/AHB_TIMER/*
+!*/Verilog/AHB_VGA/*
+
 !*/Software/Source/*
+
 !*/Constraints/*
+
 !.gitignore
