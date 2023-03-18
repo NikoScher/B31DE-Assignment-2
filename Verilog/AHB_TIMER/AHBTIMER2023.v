@@ -26,6 +26,8 @@ module AHBTIMER(
   reg [31:0]  rHADDR;
   reg [31:0]  rHWDATA;
   reg [31:0]  rHRDATA;
+  reg         rHWRITE;
+  reg         rHREADYOUT;
 
   reg [31:0]  rLIMITV;
   reg [31:0]  rCURRENTV;
@@ -49,9 +51,11 @@ module AHBTIMER(
 
   always @(posedge HCLK or negedge HRESETn) begin
     if(!HRESETn) begin
-      rHADDR    <= 32'h0;
+      rHADDR    <= LIMITV_ADDR;
       rHWDATA   <= 32'h0;
       rHRDATA   <= 32'h0;
+      rHWRITE   <= 1'b0;
+      rHREADYOUT<= 1'b1;
 
       rLIMITV   <= 32'hffffffff;
       rCURRENTV <= 32'h0;
@@ -61,31 +65,31 @@ module AHBTIMER(
     if (HSEL) begin
       rHADDR	<= HADDR;
       rHWDATA	<= HWDATA;
-      if (HWRITE) begin
-        if (rHADDR == LIMITV_ADDR)
-          rLIMITV <= rHWDATA;
-        if (rHADDR == CONTROL_ADDR)
-          rCONTROL <= rHWDATA[3:0];
-      end
+      rHWRITE <= HWRITE;
     end
   end
   
   always @(posedge HCLK) begin
-    if (HSEL && HREADY)
-      rHRDATA <= rCURRENTV;
-
+    // If timer is 'on'
     if ((rCONTROL & 4'b0001) == 4'b0001) begin
-      if ((((rCONTROL & 4'b1000) == 4'b1000) && (rCLK16 == 1'b1)) || (((rCONTROL & 4'b1000) == 4'b0000) && (rCLK16 == 1'b0))) begin
+      // If using prescaler and prescaler clk high, or if not using prescaler
+      if ((((rCONTROL & 4'b1000) == 4'b1000) && (rCLK16 == 1'b1)) || ((rCONTROL & 4'b1000) == 4'b0000)) begin
+        // If timer counting up
         if ((rCONTROL & 4'b0010) == 4'b0010) begin
           rCURRENTV <= rCURRENTV + 1;
-          if ((((rCONTROL & 4'b0100) == 4'b0100) && (rCURRENTV == rLIMITV)) && (((rCONTROL & 4'b0100) == 4'b0000) && (rCURRENTV == 32'hffffffff))) begin
+          if ((((rCONTROL & 4'b0100) == 4'b0100) && (rCURRENTV >= rLIMITV)) || (((rCONTROL & 4'b0100) == 4'b0000) && (rCURRENTV >= 32'hffffffff))) begin
             //Interupt cause hit limit
             rCURRENTV <= 32'h0;
           end
         end
+        // If timer counting down
         else begin
           rCURRENTV <= rCURRENTV - 1;
-          if (rCURRENTV == 32'h0) begin
+          // Case where we just switched from counting up to down
+          if (rCURRENTV > rLIMITV) begin
+            rCURRENTV <= rLIMITV;
+          end
+          if (rCURRENTV <= 32'h0) begin
             //Interupt cause hit limit
             if ((rCONTROL & 4'b0100) == 4'b0100)
               rCURRENTV <= rLIMITV;
@@ -96,9 +100,32 @@ module AHBTIMER(
         // Interupt cause value changed
       end
     end
+
+    if (HSEL) begin
+      // If reading
+      if ((rHWRITE == 1'b0) && HREADY) begin
+        rHREADYOUT <= 1'b1;
+        if (rHADDR == LIMITV_ADDR)
+          rHRDATA <= rLIMITV;
+        if (rHADDR == CURRENTV_ADDR)
+          rHRDATA <= rCURRENTV;
+        if (rHADDR == CONTROL_ADDR)
+          rHRDATA <= rCONTROL;
+      end
+      // If writing
+      if (rHWRITE == 1'b1) begin
+        rHREADYOUT <= 1'b0;
+        if (rHADDR == LIMITV_ADDR)
+          rLIMITV <= rHWDATA;
+        if (rHADDR == CURRENTV_ADDR)
+          rCURRENTV <= rHWDATA;
+        if (rHADDR == CONTROL_ADDR)
+          rCONTROL <= rHWDATA[3:0];
+      end
+    end
   end
 
   assign HRDATA = rHRDATA;
-  assign HREADYOUT = 1'b1;
+  assign HREADYOUT = rHREADYOUT;
 
 endmodule
