@@ -7,14 +7,13 @@ module prescaler(
   output wire outCLK
 );
 
+`define PRESCALE 8'hf0
+
 reg [7:0] rCOUNTER;
 
-always @(posedge inCLK) begin
+always @(posedge inCLK)
   rCOUNTER <= rCOUNTER + 1'b1;
-  if (rCOUNTER == 8'hff)
-    rCOUNTER <= 8'h0;
-end
   
-assign outCLK = rCOUNTER == 8'hf0;
+assign outCLK = rCOUNTER == `PRESCALE;
 
 endmodule

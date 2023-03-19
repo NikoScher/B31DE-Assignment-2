@@ -21,10 +21,10 @@ module AHBTIMER(
   `define CURRENTV_ADDR 32'h5200_0004
   `define CONTROL_ADDR  32'h5200_0008
 
-  reg timer_irq_next;
+  reg rTIMERIRQ;
 
+  reg         rHSEL;
   reg [31:0]  rHADDR;
-  reg [31:0]  rHWDATA;
   reg [31:0]  rHRDATA;
   reg         rHWRITE;
   reg         rHREADYOUT;
@@ -33,47 +33,52 @@ module AHBTIMER(
   reg [31:0]  rCURRENTV;
   reg [3:0]   rCONTROL;
 
-  //Prescaled clk signals (HCLK/16)
-  wire CLK16;
-  reg rCLK16;
+  //Prescaled clk signals (HCLK/128)
+  wire CLK128;
+  reg rCLK128;
 
   //Generate prescaled clk ticks
-  prescaler uprescaler16(
-    .inclk(HCLK),
-    .outclk(CLK16)
+  prescaler uprescaler128(
+    .inCLK(HCLK),
+    .outCLK(CLK128)
   );
 
-  always @(posedge CLK16)
-    rCLK16 = 1'b1;
+  always @(posedge CLK128, negedge CLK128)
+    if (!CLK128)
+      rCLK128 = 1'b1;
+    else
+      rCLK128 = 1'b0;
 
-  always @(negedge CLK16)
-    rCLK16 = 1'b0;
-
-  always @(posedge HCLK or negedge HRESETn) begin
-    if(!HRESETn) begin
-      rHADDR    <= LIMITV_ADDR;
-      rHWDATA   <= 32'h0;
+    // Reset Logic
+/*   always @(posedge HCLK, negedge HRESETn)
+    if (HRESETn) begin
+      rHADDR    <= `LIMITV_ADDR;
       rHRDATA   <= 32'h0;
+      rHSEL     <= 1'b0;
       rHWRITE   <= 1'b0;
       rHREADYOUT<= 1'b1;
 
       rLIMITV   <= 32'hffffffff;
       rCURRENTV <= 32'h0;
-      rCONTROL  <= 4'b0101;
-    end
+      rCONTROL  <= 4'b0011;
+    end */
 
-    if (HSEL) begin
+  // Address Phase: Sample bus
+  always @(posedge HCLK) begin
+    //if (HREADY) begin
+      rHSEL   <= HSEL;
       rHADDR	<= HADDR;
-      rHWDATA	<= HWDATA;
       rHWRITE <= HWRITE;
-    end
+    //end
   end
   
+  // Timer logic
   always @(posedge HCLK) begin
+    rLIMITV <= 32'h6FFFFFFF;
     // If timer is 'on'
     if ((rCONTROL & 4'b0001) == 4'b0001) begin
       // If using prescaler and prescaler clk high, or if not using prescaler
-      if ((((rCONTROL & 4'b1000) == 4'b1000) && (rCLK16 == 1'b1)) || ((rCONTROL & 4'b1000) == 4'b0000)) begin
+      if ((((rCONTROL & 4'b1000) == 4'b1000) && (rCLK128)) || ((rCONTROL & 4'b1000) == 4'b0000)) begin
         // If timer counting up
         if ((rCONTROL & 4'b0010) == 4'b0010) begin
           rCURRENTV <= rCURRENTV + 1;
@@ -86,9 +91,8 @@ module AHBTIMER(
         else begin
           rCURRENTV <= rCURRENTV - 1;
           // Case where we just switched from counting up to down
-          if (rCURRENTV > rLIMITV) begin
+          if (rCURRENTV > rLIMITV)
             rCURRENTV <= rLIMITV;
-          end
           if (rCURRENTV <= 32'h0) begin
             //Interupt cause hit limit
             if ((rCONTROL & 4'b0100) == 4'b0100)
@@ -101,31 +105,31 @@ module AHBTIMER(
       end
     end
 
-    if (HSEL) begin
-      // If reading
-      if ((rHWRITE == 1'b0) && HREADY) begin
+    // Data Phase: Push/Pull to/from bus
+    //if (rHSEL)
+      if (rHWRITE) begin
+        rHREADYOUT  <= 1'b1;
+        rHRDATA     <= 32'h0;
+        case (rHADDR)
+          `LIMITV_ADDR  : rLIMITV   <= HWDATA;
+          `CURRENTV_ADDR: rCURRENTV <= HWDATA;
+          `CONTROL_ADDR : rCONTROL  <= HWDATA[3:0];
+        endcase
+      end
+      else begin
         rHREADYOUT <= 1'b1;
-        if (rHADDR == LIMITV_ADDR)
-          rHRDATA <= rLIMITV;
-        if (rHADDR == CURRENTV_ADDR)
-          rHRDATA <= rCURRENTV;
-        if (rHADDR == CONTROL_ADDR)
-          rHRDATA <= rCONTROL;
+        case (rHADDR)
+          `LIMITV_ADDR  : rHRDATA <= rLIMITV;
+          `CURRENTV_ADDR: rHRDATA <= rCURRENTV;
+          `CONTROL_ADDR : rHRDATA <= rCONTROL;
+        endcase
       end
-      // If writing
-      if (rHWRITE == 1'b1) begin
-        rHREADYOUT <= 1'b0;
-        if (rHADDR == LIMITV_ADDR)
-          rLIMITV <= rHWDATA;
-        if (rHADDR == CURRENTV_ADDR)
-          rCURRENTV <= rHWDATA;
-        if (rHADDR == CONTROL_ADDR)
-          rCONTROL <= rHWDATA[3:0];
-      end
-    end
+
   end
 
-  assign HRDATA = rHRDATA;
-  assign HREADYOUT = rHREADYOUT;
+  //assign HRDATA = rHRDATA;
+  assign HRDATA = rCURRENTV;
+  //assign HREADYOUT = rHREADYOUT;
+  assign HREADYOUT = 1'b1;
 
 endmodule
