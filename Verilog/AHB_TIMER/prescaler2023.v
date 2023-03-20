@@ -7,7 +7,7 @@ module prescaler(
   output wire outCLK
 );
 
-`define PRESCALE 8'hf0
+`define PRESCALE 8'hff
 
 reg [7:0] rCOUNTER;
 

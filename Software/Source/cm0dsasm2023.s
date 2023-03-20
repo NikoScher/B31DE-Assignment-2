@@ -75,38 +75,13 @@ __Vectors	DCD	initial_SP		; stack pointer
 Reset_Handler   PROC
                 GLOBAL Reset_Handler
                 ENTRY
-
-				; write "GPIO" to the text console and the UART
-
-				LDR 	R1, =VGA_base_address
-				MOVS	R0, #'G'
-				STR		R0, [R1]
-				MOVS	R0, #'P'
-				STR		R0, [R1]
-				MOVS	R0, #'I'
-				STR		R0, [R1]
-				MOVS	R0, #'O'
-				STR		R0, [R1]
-
-				;LDR 	R0, =0xFFFFFFFF				;define limit
-				;LDR 	R1, =timer_limitVal_reg		;output to TIMER LIMIT
-				;STR		R0,	[R1]
-
-				;LDR 	R2, =0xFF000000
-				;LDR 	R1, =timer_currVal_reg		;output to TIMER
-				;STR	R2,	[R1]
-
-				LDR 	R2, =0x7
-				LDR 	R1, =timer_control_reg		;output to TIMER
-				STR		R2,	[R1]
-
-				LDR 	R1, =VGA_base_address
-				MOVS	R0, #'L'
-				STR		R0, [R1]
 				
 main_loop			
+				LDR 	R0, =0x5FFFFFFF				;define limit
+				LDR 	R1, =timer_limitVal_reg		;output to TIMER LIMIT
+				STR		R0,	[R1]
+
 				;Read from switch, and output to LEDs
-				
 				LDR 	R1, =0x53000004		;GPIO direction reg
 				MOVS	R0, #00				;direction input
 				STR		R0,	[R1]
@@ -125,7 +100,6 @@ main_loop
 				STR		R2,	[R1]
 
 				; read the current timer value, and write to 7-segment display
-				
 				LDR 	R1, =timer_currVal_reg		; read timer value into R3
 				LDR		R3,	[R1]
 				
@@ -158,6 +132,23 @@ main_loop
 				ANDS	R0, R0, R2					; and write to 7-segment
 				LDR 	R1, =SEG7_digit_4_register	; display digit #4
 				STR		R0, [R1]
+
+				; ASCII Shenangins
+				LDR 	R5, =VGA_base_address
+				LDR 	R4, =0x08
+				STR		R4, [R5]
+
+				MOVS	R4, #0
+				MOVS	R6, #9
+				CMP		R6, R0
+				MOV		LR, PC
+				BMI		add_over
+
+				ADDS	R4, R4, #48
+				ADD		R4, R4, R0
+
+				STR		R4, [R5]
+				; End of ASCII
 				
 				B		main_loop
 
@@ -165,6 +156,10 @@ main_loop
 				ENDP
 
 				ALIGN 		4		; Align to a word boundary
+	
+add_over
+				ADDS	R4, R4, #7
+				MOV		PC, LR
 
 		END                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
    
