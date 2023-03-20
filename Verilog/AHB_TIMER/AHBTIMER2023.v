@@ -14,14 +14,12 @@ module AHBTIMER(
   output wire [31:0] HRDATA,
   output wire HREADYOUT,
 
-  output reg timer_irq
+  output reg rTIMERIRQ
 );
 
   `define LIMITV_ADDR   32'h5200_0000
   `define CURRENTV_ADDR 32'h5200_0004
   `define CONTROL_ADDR  32'h5200_0008
-
-  reg rTIMERIRQ;
 
   reg         rHSEL;
   reg [31:0]  rHADDR;
@@ -66,6 +64,7 @@ module AHBTIMER(
   
   // Timer logic
   always @(posedge HCLK) begin
+    rTIMERIRQ <= 1'b0;
     // If timer is 'on'
     if ((rCONTROL & 4'b0001) == 4'b0001)
       // If using prescaler and prescaler clk high, or if not using prescaler
@@ -79,24 +78,21 @@ module AHBTIMER(
         // If timer counting down
         else begin
           rCURRENTV <= rCURRENTV - 1;
-          // Case where we just switched from counting up to down
-          if (rCURRENTV > rLIMITV)
-            rCURRENTV <= rLIMITV;
-          if (rCURRENTV <= 32'h0) begin
+          if (rCURRENTV == 32'h0)
             if ((rCONTROL & 4'b0100) == 4'b0100)
               rCURRENTV <= rLIMITV;
             else
               rCURRENTV <= 32'hffffffff;
-          end
         end
-        // Interupt cause value changed
+        if (rCURRENTV[7:0] == 8'h00)
+          rTIMERIRQ <= 1'b1;
       end
 
     // Data Phase: Push/Pull to/from bus
     rHREADYOUT  <= 1'b0;
     if (rHSEL)
       if (rHWRITE) begin
-        rHREADYOUT <= 1'b1;
+        rHREADYOUT  <= 1'b1;
         rHRDATA     <= 32'h0;
         case (rHADDR)
           `LIMITV_ADDR  : rLIMITV   <= HWDATA;

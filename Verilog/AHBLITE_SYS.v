@@ -110,11 +110,11 @@ module AHBLITE_SYS(
     wire          sys_reset_req;
     wire          txev;
     wire          sleeping;
-    wire  [15:0]  IRQ;
+    wire  [31:0]  IRQ;
     wire          TIMER_IRQ;
 
     // Interrupt signals
-    assign        IRQ = {15'b0000_0000_0000_000,TIMER_IRQ};
+    assign        IRQ = {31'b0,TIMER_IRQ};
     // assign        LED[7] = lockup;
     
 	  // Clock divider, divide the frequency by two, hence less time constraint 
@@ -220,7 +220,7 @@ module AHBLITE_SYS(
 
         // MISC
         .NMI           (1'b0),               // Non-maskable interrupt input
-        .IRQ           (IRQ[15:0]),                // Interrupt request inputs
+        .IRQ           (IRQ[31:0]),                // Interrupt request inputs
         .TXEV          (),                   // Event output (SEV executed)
         .RXEV          (1'b0),               // Event input
         .LOCKUP        (lockup),             // Core is locked-up
@@ -389,7 +389,7 @@ module AHBLITE_SYS(
         .HREADYOUT(hready_timer),
         .HRDATA(hrdata_timer),
         .HSEL(hsel_timer),
-        .timer_irq(TIMER_IRQ)
+        .rTIMERIRQ(TIMER_IRQ)
     );
     
     // AHBLite GPIO    

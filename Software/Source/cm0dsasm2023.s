@@ -19,14 +19,17 @@ timer_control_reg    	EQU	0x52000008
 
 GPIO_base_address	    EQU	0x53000000
 
-SEG7_digit_1_register 	EQU	0x54000000
-SEG7_digit_2_register 	EQU	0x54000004
-SEG7_digit_3_register 	EQU	0x54000008
-SEG7_digit_4_register 	EQU	0x5400000C
+SEVEN_SEG_DIGIT1 	EQU	0x54000000
+SEVEN_SEG_DIGIT2 	EQU	0x54000004
+SEVEN_SEG_DIGIT3 	EQU	0x54000008
+SEVEN_SEG_DIGIT4 	EQU	0x5400000C
 
 LED_base_address	    EQU	0x55000000
 
 initial_SP		    	EQU	0x00004000	; initial stack pointer value
+
+IRQ_enable_register		EQU 0xE000E100
+enable_IRQ0				EQU 0x00000001
 
 
 			; interrupt vector table starts at address 0x00000000 
@@ -53,7 +56,7 @@ __Vectors	DCD	initial_SP		; stack pointer
         	DCD	0
         	DCD	0
         			
-			DCD	0
+			DCD	Timer_Handler
         	DCD	0
         	DCD	0
         	DCD	0
@@ -75,12 +78,16 @@ __Vectors	DCD	initial_SP		; stack pointer
 Reset_Handler   PROC
                 GLOBAL Reset_Handler
                 ENTRY
-				
-main_loop			
+
+				LDR		R1, =IRQ_enable_register	; enable IRQ #0 interrupts
+				LDR		R0, =enable_IRQ0
+				STR		R0, [R1]
+
 				LDR 	R0, =0x5FFFFFFF				;define limit
 				LDR 	R1, =timer_limitVal_reg		;output to TIMER LIMIT
 				STR		R0,	[R1]
 
+main_loop		
 				;Read from switch, and output to LEDs
 				LDR 	R1, =0x53000004		;GPIO direction reg
 				MOVS	R0, #00				;direction input
@@ -98,40 +105,39 @@ main_loop
 
 				LDR 	R1, =timer_control_reg		;output to TIMER
 				STR		R2,	[R1]
+				
+				B		main_loop
+				ENDP
 
-				; read the current timer value, and write to 7-segment display
-				LDR 	R1, =timer_currVal_reg		; read timer value into R3
-				LDR		R3,	[R1]
-				
-				LSRS	R3,	R3, #16					; move 16 MSBs to 16 LSBs in R3
+Timer_Handler	PROC
+                EXPORT Timer_Handler
 
-				MOVS	R0,	R3						; copy R3 to R0
-				
-				LDR 	R2, =0x0F					; read 4 LSBs into R2
-				ANDS	R0, R0, R2					; and write to 7-segment 
-				LDR 	R1, =SEG7_digit_1_register	; display digit #1
-				STR		R0, [R1]
+				PUSH	{R6, R7}				; save R6 and R7 as they are used
+					
+				LDR		R6, =timer_currVal_reg	; read 32-bit timer value into R7
+				LDR		R7, [R6]
 
-				LSRS	R0,	R3, #4					; right shift R3 by 4 bits to R0
-				
-				LDR 	R2, =0x0F					; read 4 LSBs into R2
-				ANDS	R0, R0, R2					; and write to 7-segment
-				LDR 	R1, =SEG7_digit_2_register	; display digit #2
-				STR		R0, [R1]
-				
-				LSRS	R0,	R3, #8					; right shift R3 by 8 bits to R0
-				
-				LDR 	R2, =0x0F					; read 4 LSBs into R2
-				ANDS	R0, R0, R2					; and write to 7-segment
-				LDR 	R1, =SEG7_digit_3_register	; display digit #3
-				STR		R0, [R1]
-				
-				LSRS	R0,	R3, #12					; right shift R3 by 12 bits to R0
-								
-				LDR 	R2, =0x0F					; read 4 LSBs into R2
-				ANDS	R0, R0, R2					; and write to 7-segment
-				LDR 	R1, =SEG7_digit_4_register	; display digit #4
-				STR		R0, [R1]
+				LDR 	R2, =0x0F				; R2 used to mask off all but 4 LSBs
+
+				LSRS	R0, R7, #16				; right shift R7 16 bits into R0		
+				ANDS    R0, R0, R2				; mask all but 4 LSBs of R0
+				LDR		R1, =SEVEN_SEG_DIGIT1	; display that 4-bit hex digit
+				STR		R0, [R1]				; right most seven segment digit
+
+				LSRS	R0, R7, #20				; right shift R7 20 bits into R0
+				ANDS    R0, R0, R2				; mask all but 4 LSBs of R0
+				LDR		R1, =SEVEN_SEG_DIGIT2	; display that 4-bit hex digit
+				STR		R0, [R1]				; right most but one seven segment digit
+
+				LSRS	R0, R7, #24				; right shift R7 24 bits into R0		
+				ANDS    R0, R0, R2				; mask all but 4 LSBs of R0
+				LDR		R1, =SEVEN_SEG_DIGIT3	; display that 4-bit hex digit
+				STR		R0, [R1]				; right most but two seven segment digit
+
+				LSRS	R0, R7, #28				; right shift R7 28 bits into R0
+				ANDS    R0, R0, R2				; mask all but 4 LSBs of R0
+				LDR		R1, =SEVEN_SEG_DIGIT4	; display that 4-bit hex digit
+				STR		R0, [R1]				; left most seven segment digit
 
 				; ASCII Shenangins
 				LDR 	R5, =VGA_base_address
@@ -141,7 +147,7 @@ main_loop
 				MOVS	R4, #0
 				MOVS	R6, #9
 				CMP		R6, R0
-				MOV		LR, PC
+				MOV		R12, PC
 				BMI		add_over
 
 				ADDS	R4, R4, #48
@@ -149,17 +155,16 @@ main_loop
 
 				STR		R4, [R5]
 				; End of ASCII
+					
+				POP		{R6, R7}				; restore R6 and R7
 				
-				B		main_loop
+				BX		LR						; return from interrupt service routine
+				ENDP							; matches PROC at start of Timer_Handler
 
-
-				ENDP
-
-				ALIGN 		4		; Align to a word boundary
-	
 add_over
 				ADDS	R4, R4, #7
-				MOV		PC, LR
+				MOV		PC, R12
 
-		END                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+				ALIGN 		4		; Align to a word boundary
+			END                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
    
