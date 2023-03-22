@@ -6,7 +6,7 @@
   input wire HRESETn,
   input wire [31:0] HADDR,
   input wire [31:0] HWDATA,
-  input wire [1:0] HTRANS,
+  input wire [1:0] HTRANS, 
   input wire HWRITE,
   input wire HSEL,
   input wire HREADY,

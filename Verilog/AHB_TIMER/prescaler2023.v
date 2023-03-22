@@ -13,7 +13,7 @@ reg [7:0] rCOUNTER;
 
 always @(posedge inCLK)
   rCOUNTER <= rCOUNTER + 1'b1;
-  
+
 assign outCLK = rCOUNTER == `PRESCALE;
 
 endmodule

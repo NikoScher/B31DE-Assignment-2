@@ -40,20 +40,6 @@ module AHBTIMER(
     .outCLK(CLK256)
   );
 
-    // Reset Logic
-/*   always @(posedge HCLK, negedge HRESETn)
-    if (HRESETn) begin
-      rHADDR    <= `LIMITV_ADDR;
-      rHRDATA   <= 32'h0;
-      rHSEL     <= 1'b0;
-      rHWRITE   <= 1'b0;
-      rHREADYOUT<= 1'b1;
-
-      rLIMITV   <= 32'hffffffff;
-      rCURRENTV <= 32'h0;
-      rCONTROL  <= 4'b0011;
-    end */
-
   // Address Phase: Sample bus
   always @(posedge HCLK)
     if (HREADY) begin
@@ -111,8 +97,7 @@ module AHBTIMER(
 
   end
 
-  //assign HRDATA = rHRDATA;
-  assign HRDATA = rCURRENTV;
+  assign HRDATA = rHRDATA;
   assign HREADYOUT = rHREADYOUT;
 
 endmodule
